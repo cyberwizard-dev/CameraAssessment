@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -28,10 +30,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,9 +56,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import sito.remi.cameraassessment.ui.theme.CameraAssessmentTheme
-import java.io.File
 import java.text.SimpleDateFormat
-
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -204,44 +201,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+
     private fun saveImageToGallery(imageCapture: ImageCapture?, context: Context, cameraName: String) {
+        val timeStamp = getCurrentTime()
+        val imageName = "$cameraName-$timeStamp.jpg"
 
-            imageCapture?.let { capture ->
-                val filename = "${cameraName}_${getCurrentTime()}.jpg"
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM)
-                }
-
-                val imageUri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-
-                val file = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), filename)
-                val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
-
-                // I Set up image capture listener, which is triggered after photo has been taken
-                capture.takePicture(
-                    outputOptions,
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                            val msg = "Photo capture succeeded: $imageUri"
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            Log.i("log",msg)
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            val msg = "Photo capture failed: ${exception.message}"
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                )
-
-            }
 
 
     }
-
 
     private fun getCurrentTime(): String {
         return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
@@ -348,4 +316,6 @@ class MainActivity : ComponentActivity() {
 
 
 }
+
+
 
