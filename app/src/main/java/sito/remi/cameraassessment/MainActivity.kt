@@ -56,7 +56,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import sito.remi.cameraassessment.ui.theme.CameraAssessmentTheme
 import java.io.File
 import java.text.SimpleDateFormat
@@ -74,11 +73,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (hasCameraPermission()) {
-                        CameraApp()
-                    } else {
-                        requestCameraPermission()
-                    }
+
+                    CameraApp()
+
                 }
             }
         }
@@ -91,6 +88,9 @@ class MainActivity : ComponentActivity() {
         onCameraSwitch: () -> Unit,
         imageCapture: MutableState<ImageCapture?>
     ) {
+
+
+
         val context = LocalContext.current
         val cameraProviderFuture: ListenableFuture<ProcessCameraProvider> = ProcessCameraProvider.getInstance(context)
 
@@ -132,6 +132,10 @@ class MainActivity : ComponentActivity() {
         var activeCamera by remember { mutableIntStateOf(1) } // 1 for front camera, 2 for back camera
         var cameraName by remember { mutableStateOf("cam") }
 
+        if (hasPermissions()) {
+        } else {
+            requestPermissions()
+        }
         // Update the clock display every second
         LaunchedEffect(Unit) {
             while (true) {
@@ -151,11 +155,11 @@ class MainActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = "Moleculight Dual Camera Control", color = Color.Black, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(20.dp)) // Add space after the header
+                Spacer(modifier = Modifier.height(20.dp))
                 Row {
                     Box(
                         modifier = Modifier
-                            .size(200.dp, 300.dp) // Set fixed width and height
+                            .size(200.dp, 300.dp)
                             .clickable { activeCamera = 1 },
                         contentAlignment = Alignment.Center
                     ) {
@@ -191,7 +195,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
-                Button(onClick = { captureImage(imageCapture.value,ctx,cameraName) }) {
+                Button(onClick = { saveImageToGallery(imageCapture.value,ctx,cameraName) }) {
                     Text(text = "Save Image on $cameraName", color = Color.Black)
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -200,11 +204,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun captureImage(imageCapture: ImageCapture?, context: Context, cameraName: String) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(context, "Storage permission is required to save images.", Toast.LENGTH_SHORT).show()
-        } else {
+    private fun saveImageToGallery(imageCapture: ImageCapture?, context: Context, cameraName: String) {
+
             imageCapture?.let { capture ->
                 val filename = "${cameraName}_${getCurrentTime()}.jpg"
                 val contentValues = ContentValues().apply {
@@ -226,6 +227,7 @@ class MainActivity : ComponentActivity() {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                             val msg = "Photo capture succeeded: $imageUri"
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            Log.i("log",msg)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
@@ -234,8 +236,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
+
             }
-        }
+
+
     }
 
 
@@ -243,43 +247,74 @@ class MainActivity : ComponentActivity() {
         return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
     }
 
-
-    private fun hasCameraPermission(): Boolean {
+    private fun hasPermissions(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
+        ) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun requestCameraPermission() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.CAMERA),
-            CAMERA_PERMISSION_REQUEST_CODE
-        )
+
+     fun requestPermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            // Camera permission is not granted, request for permission
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                CAMERA_PERMISSION_REQUEST_CODE
+            )
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED) {
+            // Storage permission is not granted, request for permission
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                STORAGE_PERMISSION_REQUEST_CODE
+            )
+        }
     }
-    @Deprecated("Deprecated in Java")
+
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE || requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
+            var cameraPermissionGranted = false
+            var storagePermissionGranted = false
+
+            for (i in permissions.indices) {
+                if (permissions[i] == Manifest.permission.CAMERA && grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    cameraPermissionGranted = true
+                }
+                if (permissions[i] == Manifest.permission.WRITE_EXTERNAL_STORAGE && grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    storagePermissionGranted = true
+                }
+            }
+
+            if (cameraPermissionGranted && storagePermissionGranted) {
                 setContent {
                     CameraAssessmentTheme {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background,
                             content = { CameraApp() }
-
                         )
-
                     }
                 }
             } else {
-                setContent {
+
+                requestPermissions()
+               /* setContent {
                     CameraAssessmentTheme {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
@@ -295,18 +330,19 @@ class MainActivity : ComponentActivity() {
                                     contentDescription = "Camera",
                                     modifier = Modifier.padding(16.dp)
                                 )
-
-                                Text("Permission Denied for Camera")
+                                Text("Permission Denied")
                             }
                         }
                     }
-                }
+                }*/
             }
         }
     }
 
+
     companion object {
         private const val CAMERA_PERMISSION_REQUEST_CODE = 100
+        private const val STORAGE_PERMISSION_REQUEST_CODE = 101
     }
 
 
