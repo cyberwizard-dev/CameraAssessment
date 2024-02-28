@@ -386,7 +386,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } else {
-                //Permissions denied, show a message or handle it appropriately
+                //Permissions denied, shows a message.
                 Toast.makeText(this, "Permissions not granted yet.", Toast.LENGTH_SHORT).show()
             }
         }
