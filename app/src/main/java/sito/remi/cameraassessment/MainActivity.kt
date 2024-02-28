@@ -81,7 +81,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-
                     CameraApp()
 
                 }
@@ -141,8 +140,11 @@ class MainActivity : ComponentActivity() {
         var activeCamera by remember { mutableIntStateOf(1) } // 1 for front camera, 2 for back camera
         var cameraName by remember { mutableStateOf("cam") }
 
-        if (!hasPermissions()) {
+        if (hasPermissions()) {
+        }else{
+
             requestPermissions()
+
         }
 
         // Update the clock display every second
@@ -373,6 +375,7 @@ class MainActivity : ComponentActivity() {
             }
 
             if (cameraPermissionGranted && storagePermissionGranted) {
+                // Permissions granted, show the CameraApp
                 setContent {
                     CameraAssessmentTheme {
                         Surface(
@@ -383,33 +386,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } else {
-
-                requestPermissions()
-               /* setContent {
-                    CameraAssessmentTheme {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = Color.White
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Clear,
-                                    contentDescription = "Camera",
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                                Text("Permission Denied")
-                            }
-                        }
-                    }
-                }*/
+                //Permissions denied, show a message or handle it appropriately
+                Toast.makeText(this, "Permissions not granted yet.", Toast.LENGTH_SHORT).show()
             }
         }
     }
-
 
     companion object {
         private const val CAMERA_PERMISSION_REQUEST_CODE = 100
