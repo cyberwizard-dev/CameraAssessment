@@ -1,12 +1,16 @@
 package sito.remi.cameraassessment
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.Point
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
@@ -20,6 +24,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,6 +50,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -56,7 +64,10 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.delay
 import sito.remi.cameraassessment.ui.theme.CameraAssessmentTheme
+import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
@@ -113,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }, executor)
 
+
                 // Toggle camera when tapped
                 setOnClickListener {
                     onCameraSwitch()
@@ -129,10 +141,10 @@ class MainActivity : ComponentActivity() {
         var activeCamera by remember { mutableIntStateOf(1) } // 1 for front camera, 2 for back camera
         var cameraName by remember { mutableStateOf("cam") }
 
-        if (hasPermissions()) {
-        } else {
+        if (!hasPermissions()) {
             requestPermissions()
         }
+
         // Update the clock display every second
         LaunchedEffect(Unit) {
             while (true) {
@@ -151,26 +163,39 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = "Moleculight Dual Camera Control", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Moleculight Camera Control",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold
+                )
                 Spacer(modifier = Modifier.height(20.dp))
-                Row {
+
+                Row(modifier = Modifier.animateContentSize()) {
                     Box(
                         modifier = Modifier
                             .size(200.dp, 300.dp)
                             .clickable { activeCamera = 1 },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Start the front camera preview if activeCamera is 1
                         if (activeCamera == 1) {
-                            cameraName = "frontCamera"
+
                             CameraPreview(
                                 isFrontCamera = true,
                                 lifecycleOwner = LocalLifecycleOwner.current,
                                 onCameraSwitch = { activeCamera = 2 },
                                 imageCapture = imageCapture
+
+                            )
+                        } else {
+                            Text(
+                                text = "Tap to switch!",
+                                color = Color.Black,
+                                modifier = Modifier.alpha(0.5f)
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(20.dp))
 
                     Box(
                         modifier = Modifier
@@ -178,37 +203,115 @@ class MainActivity : ComponentActivity() {
                             .clickable { activeCamera = 2 },
                         contentAlignment = Alignment.Center
                     ) {
-
-                        // Start the back camera preview if activeCamera is 2
                         if (activeCamera == 2) {
-                            cameraName="backCamera"
+                            cameraName = "Back Camera"
                             CameraPreview(
                                 isFrontCamera = false,
                                 lifecycleOwner = LocalLifecycleOwner.current,
                                 onCameraSwitch = { activeCamera = 1 },
                                 imageCapture = imageCapture
+
+                            )
+                        } else {
+                            Text(
+                                text = "Tap to switch!",
+                                color = Color.Black,
+                                modifier = Modifier.alpha(0.5f)
                             )
                         }
                     }
                 }
+
                 Spacer(modifier = Modifier.height(20.dp))
-                Button(onClick = { saveImageToGallery(imageCapture.value,ctx,cameraName) }) {
-                    Text(text = "Save Image on $cameraName", color = Color.Black)
+                Button(onClick = { saveImageToGallery(imageCapture.value, ctx, cameraName) }) {
+                    Text(text = "Save Image on $cameraName", color = Color.White)
                 }
                 Spacer(modifier = Modifier.height(20.dp))
-                Text(text = "Clock Display: $currentTime", color = Color.Black)
+                DigitalClock()
             }
         }
     }
 
 
+    @SuppressLint("NewApi")
+    @Composable
+    fun DigitalClock() {
+        val currentDateTime = remember { mutableStateOf(LocalDateTime.now()) }
+
+        LaunchedEffect(key1 = currentDateTime) {
+            while (true) {
+                currentDateTime.value = LocalDateTime.now()
+                delay(1000)
+            }
+        }
+
+        Text(
+            text = "Time: ${currentDateTime.value.format(DateTimeFormatter.ofPattern("HH:mm:ss a"))}",
+            color = Color.Black,
+            style = MaterialTheme.typography.headlineMedium
+        )
+    }
+
 
     private fun saveImageToGallery(imageCapture: ImageCapture?, context: Context, cameraName: String) {
-        val timeStamp = getCurrentTime()
+        if (imageCapture == null) {
+            Log.e("CameraApp", "ImageCapture is null, cannot save image")
+            Toast.makeText(context, "ImageCapture is null, cannot save image", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val imageName = "$cameraName-$timeStamp.jpg"
 
+        val contentResolver = context.contentResolver
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, imageName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
+            put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + File.separator + "CameraAssessment")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
 
+        val imageUri: Uri? = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
 
+        val outputDirectory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "CameraAssessment")
+        if (!outputDirectory.exists()) {
+            outputDirectory.mkdirs()
+        }
+
+        val file = File(outputDirectory, imageName)
+
+        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(file).build()
+
+        imageCapture.takePicture(
+            outputFileOptions,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exception: ImageCaptureException) {
+                    val errorMessage = "Failed to save image: ${exception.message}"
+                    Log.e("CameraApp", errorMessage, exception)
+                    Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val successMessage = "Image saved successfully: ${outputFileResults.savedUri}"
+                    Log.i("CameraApp", successMessage)
+                    Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        contentValues.clear()
+                        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                        contentResolver.update(imageUri!!, contentValues, null, null)
+                    }
+
+                    // Now, let us Notify the system about the new file
+                    context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)))
+                }
+            }
+        )
     }
 
     private fun getCurrentTime(): String {
@@ -227,7 +330,7 @@ class MainActivity : ComponentActivity() {
     }
 
 
-     fun requestPermissions() {
+     private fun requestPermissions() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED) {
             // Camera permission is not granted, request for permission
